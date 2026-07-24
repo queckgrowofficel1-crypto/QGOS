@@ -11,111 +11,756 @@ datasource db {
 }
 
 // ============================================================================
-// CORE MODELS
+// ENUMS
+// ============================================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+enum UserRole {
+  ADMIN
+  MODERATOR
+  AGENT
+  USER
+}
+
+enum WalletType {
+  PRIMARY
+  SECONDARY
+  TRADING
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  INVESTMENT
+  INCOME
+  REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PackageType {
+  BASIC
+  STANDARD
+  PREMIUM
+  ELITE
+  VIP
+}
+
+enum PackageStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum InvestmentStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  MATURED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum DepositStatus {
+  PENDING
+  VERIFIED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum KYCStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum KYCDocumentType {
+  PASSPORT
+  NATIONAL_ID
+  DRIVING_LICENSE
+  VISA
+  RESIDENCE_PERMIT
+}
+
+enum OTPType {
+  EMAIL_VERIFICATION
+  SMS_VERIFICATION
+  TWO_FACTOR_AUTH
+  PASSWORD_RESET
+  WITHDRAWAL
+}
+
+enum OTPStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  INVALID
+}
+
+enum RankType {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+  CROWN
+}
+
+enum IncomeType {
+  REFERRAL
+  BINARY
+  MATCHING
+  RANK
+  BONUS
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+  TRANSACTION
+  SYSTEM
+}
+
+enum AuditLogAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  WITHDRAW
+  DEPOSIT
+  TRANSFER
+}
+
+// ============================================================================
+// CORE USER MODELS
 // ============================================================================
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  username  String   @unique
-  password  String
-  fullName  String?
-  avatar    String?
-  
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String      @id @default(cuid())
+  email             String      @unique
+  phone             String?     @unique
+  username          String?     @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  fullName          String?
+  avatar            String?
+  dateOfBirth       DateTime?
+  gender            String?
+
+  status            UserStatus  @default(PENDING_VERIFICATION)
+  role              UserRole    @default(USER)
+  isEmailVerified   Boolean     @default(false)
+  isPhoneVerified   Boolean     @default(false)
+  isTwoFactorEnabled Boolean    @default(false)
+  lastLoginAt       DateTime?
+  lastLoginIP       String?
+
+  // Referral System
+  referrerId        String?
+  referrer          User?       @relation("Referrals", fields: [referrerId], references: [id], onDelete: SetNull)
+  referrals         User[]      @relation("Referrals")
+  referralCode      String?     @unique
 
   // Relations
-  roles     Role[]
-  
-  @@map("users")
+  wallets           Wallet[]
+  transactions      Transaction[]
+  investments       Investment[]
+  deposits          Deposit[]
+  withdrawals       Withdrawal[]
+  kyc               KYC?
+  otps              OTP[]
+  sessions          Session[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  binaryLeftChild   User?       @relation("BinaryLeft", fields: [binaryLeftChildId], references: [id], onDelete: SetNull)
+  binaryLeftChildId String?
+  binaryRightChild  User?       @relation("BinaryRight", fields: [binaryRightChildId], references: [id], onDelete: SetNull)
+  binaryRightChildId String?
+  binaryParent      User?       @relation("BinaryParent", fields: [binaryParentId], references: [id], onDelete: SetNull)
+  binaryParentId    String?
+  binaryChildren    User[]      @relation("BinaryParent")
+  binaryIncome      BinaryIncome[]
+  matchingIncome    MatchingIncome[]
+  rankRewards       RankReward[]
+  referralIncomes   ReferralIncome[]
+  roles             Role[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
+
   @@index([email])
   @@index([username])
+  @@index([phone])
+  @@index([referrerId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+// ============================================================================
+// WALLET & TRANSACTION MODELS
+// ============================================================================
+
+model Wallet {
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type              WalletType  @default(PRIMARY)
+  currency          String      @default("USD")
+  balance           Decimal     @default(0) @db.Decimal(18, 8)
+  totalDeposited    Decimal     @default(0) @db.Decimal(18, 8)
+  totalWithdrawn    Decimal     @default(0) @db.Decimal(18, 8)
+  totalEarned       Decimal     @default(0) @db.Decimal(18, 8)
+
+  isActive          Boolean     @default(true)
+  lastTransactionAt DateTime?
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@index([isActive])
+  @@map("wallets")
+}
+
+model Transaction {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletId          String
+  wallet            Wallet              @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  type              TransactionType
+  status            TransactionStatus   @default(PENDING)
+  amount            Decimal             @db.Decimal(18, 8)
+  fee               Decimal             @default(0) @db.Decimal(18, 8)
+  netAmount         Decimal             @db.Decimal(18, 8)
+  currency          String              @default("USD")
+  description       String?
+  reference         String?             @unique
+  metadata          Json?
+
+  // Related models
+  depositId         String?
+  deposit           Deposit?            @relation(fields: [depositId], references: [id])
+  withdrawalId      String?
+  withdrawal        Withdrawal?         @relation(fields: [withdrawalId], references: [id])
+  investmentId      String?
+  investment        Investment?         @relation(fields: [investmentId], references: [id])
+  incomeId          String?
+
+  processedAt       DateTime?
+  failureReason     String?
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([walletId])
+  @@index([type])
+  @@index([status])
+  @@index([reference])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+// ============================================================================
+// INVESTMENT & PACKAGE MODELS
+// ============================================================================
+
+model Package {
+  id                String          @id @default(cuid())
+  name              String
+  type              PackageType
+  status            PackageStatus   @default(ACTIVE)
+  description       String?
+
+  minAmount         Decimal         @db.Decimal(18, 8)
+  maxAmount         Decimal         @db.Decimal(18, 8)
+  dailyROI          Decimal         @db.Decimal(5, 2) // Percentage
+  monthlyROI        Decimal         @db.Decimal(5, 2)
+  yearlyROI         Decimal         @db.Decimal(5, 2)
+  maturityPeriodDays Int
+  includeReferralBonus Boolean      @default(true)
+  referralBonusPercentage Decimal   @default(0) @db.Decimal(5, 2)
+
+  maxInvestors      Int?
+  currentInvestors  Int             @default(0)
+  displayOrder      Int             @default(0)
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  @@index([status])
+  @@index([type])
+  @@map("packages")
+}
+
+model Investment {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packageId         String
+  package           Package             @relation(fields: [packageId], references: [id])
+
+  status            InvestmentStatus    @default(PENDING)
+  amount            Decimal             @db.Decimal(18, 8)
+  dailyROI          Decimal             @db.Decimal(5, 2)
+  monthlyROI        Decimal             @db.Decimal(5, 2)
+  yearlyROI         Decimal             @db.Decimal(5, 2)
+
+  investmentDate    DateTime
+  maturityDate      DateTime
+  totalReturn       Decimal             @default(0) @db.Decimal(18, 8)
+  totalEarned       Decimal             @default(0) @db.Decimal(18, 8)
+
+  isReinvested      Boolean             @default(false)
+  reinvestedCount   Int                 @default(0)
+
+  // Relations
+  transactions      Transaction[]
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([packageId])
+  @@index([status])
+  @@index([maturityDate])
+  @@index([createdAt])
+  @@map("investments")
+}
+
+// ============================================================================
+// INCOME MODELS
+// ============================================================================
+
+model ReferralIncome {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referralUserId    String
+  referralUser      User?           @relation(fields: [referralUserId], references: [id], onDelete: SetNull)
+
+  amount            Decimal         @db.Decimal(18, 8)
+  percentage        Decimal         @default(0) @db.Decimal(5, 2)
+  level             Int             @default(1)
+  
+  isProcessed       Boolean         @default(false)
+  processedAt       DateTime?
+  description       String?
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([referralUserId])
+  @@index([isProcessed])
+  @@index([createdAt])
+  @@map("referral_incomes")
+}
+
+model BinaryIncome {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  leftLegAmount     Decimal         @default(0) @db.Decimal(18, 8)
+  rightLegAmount    Decimal         @default(0) @db.Decimal(18, 8)
+  pairBonus         Decimal         @default(0) @db.Decimal(18, 8)
+
+  isProcessed       Boolean         @default(false)
+  processedAt       DateTime?
+  period            DateTime        // Month/Period for binary calculation
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([isProcessed])
+  @@index([period])
+  @@map("binary_incomes")
+}
+
+model MatchingIncome {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount            Decimal         @db.Decimal(18, 8)
+  percentage        Decimal         @default(0) @db.Decimal(5, 2)
+  fromInvestmentId  String?
+  level             Int             @default(1)
+
+  isProcessed       Boolean         @default(false)
+  processedAt       DateTime?
+  description       String?
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([isProcessed])
+  @@index([createdAt])
+  @@map("matching_incomes")
+}
+
+model RankReward {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rank              RankType
+  amount            Decimal         @db.Decimal(18, 8)
+  bonusPercentage   Decimal         @default(0) @db.Decimal(5, 2)
+
+  isProcessed       Boolean         @default(false)
+  processedAt       DateTime?
+  awardedAt         DateTime
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([rank])
+  @@index([isProcessed])
+  @@map("rank_rewards")
+}
+
+// ============================================================================
+// WITHDRAWAL & DEPOSIT MODELS
+// ============================================================================
+
+model Withdrawal {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status            WithdrawalStatus    @default(PENDING)
+  amount            Decimal             @db.Decimal(18, 8)
+  fee               Decimal             @default(0) @db.Decimal(18, 8)
+  netAmount         Decimal             @db.Decimal(18, 8)
+  currency          String              @default("USD")
+
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankName          String?
+  bankCode          String?
+  bankCountry       String?
+  
+  // Alternative payment methods
+  cryptoAddress     String?
+  cryptoNetwork     String?
+  paymentMethod     String?
+
+  approvedBy        String?
+  approvalNote      String?
+  rejectionReason   String?
+
+  transactions      Transaction[]
+  approvedAt        DateTime?
+  completedAt       DateTime?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("withdrawals")
+}
+
+model Deposit {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status            DepositStatus   @default(PENDING)
+  amount            Decimal         @db.Decimal(18, 8)
+  currency          String          @default("USD")
+  transactionHash   String?         @unique
+
+  // Payment details
+  paymentMethod     String?
+  bankName          String?
+  bankAccountNumber String?
+  cardLast4         String?
+  cryptoNetwork     String?
+  cryptoAddress     String?
+
+  verifiedBy        String?
+  verificationNote  String?
+  verifiedAt        DateTime?
+
+  transactions      Transaction[]
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([transactionHash])
+  @@index([createdAt])
+  @@map("deposits")
+}
+
+// ============================================================================
+// KYC & VERIFICATION MODELS
+// ============================================================================
+
+model KYC {
+  id                String              @id @default(cuid())
+  userId            String              @unique
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status            KYCStatus           @default(NOT_STARTED)
+  
+  // Personal Information
+  firstName         String?
+  lastName          String?
+  dateOfBirth       DateTime?
+  nationality       String?
+  address           String?
+  city              String?
+  state             String?
+  postalCode        String?
+  country           String?
+
+  // Document Information
+  documentType      KYCDocumentType?
+  documentNumber    String?
+  documentIssueDate DateTime?
+  documentExpiryDate DateTime?
+  documentFrontUrl  String?
+  documentBackUrl   String?
+
+  // Verification Details
+  verifiedAt        DateTime?
+  verifiedBy        String?
+  rejectionReason   String?
+  expiryDate        DateTime?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([documentNumber])
+  @@map("kyc")
+}
+
+model OTP {
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type              OTPType
+  code              String
+  status            OTPStatus   @default(PENDING)
+  
+  email             String?
+  phone             String?
+  
+  attempts          Int         @default(0)
+  maxAttempts       Int         @default(5)
+  
+  expiresAt         DateTime
+  verifiedAt        DateTime?
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("otps")
+}
+
+// ============================================================================
+// SESSION & NOTIFICATION MODELS
+// ============================================================================
+
+model Session {
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token             String      @unique
+  refreshToken      String?     @unique
+  
+  ipAddress         String?
+  userAgent         String?
+  deviceType        String?
+  browser           String?
+  
+  isActive          Boolean     @default(true)
+  expiresAt         DateTime
+  lastActivityAt    DateTime    @default(now())
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([token])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Notification {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type              NotificationType
+  title             String
+  message           String
+  data              Json?
+
+  isRead            Boolean             @default(false)
+  readAt            DateTime?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ============================================================================
+// AUDIT & ADMIN MODELS
+// ============================================================================
+
+model AuditLog {
+  id                String              @id @default(cuid())
+  userId            String?
+  user              User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action            AuditLogAction
+  entity            String
+  entityId          String
+  
+  oldValues         Json?
+  newValues         Json?
+  changes           String?
+  
+  ipAddress         String?
+  userAgent         String?
+  
+  status            String              @default("SUCCESS")
+  errorMessage      String?
+
+  createdAt         DateTime            @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 model Role {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  description String?
+  id                String      @id @default(cuid())
+  name              String      @unique
+  slug              String      @unique
+  description       String?
   
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isSystem          Boolean     @default(false)
 
-  // Relations
-  users     User[]
-  permissions Permission[]
+  permissions       Permission[]
+  users             User[]
 
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([slug])
   @@map("roles")
 }
 
 model Permission {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  description String?
-  module    String
-  action    String
+  id                String      @id @default(cuid())
+  name              String      @unique
+  slug              String      @unique
+  description       String?
   
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  module            String
+  action            String
+  
+  isSystem          Boolean     @default(false)
 
-  // Relations
-  roles     Role[]
+  roles             Role[]
 
-  @@map("permissions")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
   @@index([module])
+  @@index([action])
+  @@map("permissions")
 }
 
-// ============================================================================
-// AUDIT & LOGGING
-// ============================================================================
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  action    String
-  entity    String
-  entityId  String
-  userId    String?
-  changes   Json?
-  status    String   @default("SUCCESS")
+model Setting {
+  id                String      @id @default(cuid())
+  key               String      @unique
+  value             Json
+  description       String?
+  category          String?
   
-  createdAt DateTime @default(now())
+  isPublic          Boolean     @default(false)
+  isReadOnly        Boolean     @default(false)
 
-  @@map("audit_logs")
-  @@index([userId])
-  @@index([entity])
-  @@index([createdAt])
-}
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
-// ============================================================================
-// CONFIGURATION & SETTINGS
-// ============================================================================
-
-model SystemConfig {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     Json
-  description String?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("system_configs")
-}
-
-// ============================================================================
-// APPLICATION STATE
-// ============================================================================
-
-model AppState {
-  id        String   @id @default(cuid())
-  status    String   @default("RUNNING")
-  metadata  Json?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("app_states")
+  @@index([key])
+  @@index([category])
+  @@map("settings")
 }
