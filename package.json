@@ -23,16 +23,22 @@
     "typeorm:migration:generate": "typeorm migration:generate",
     "typeorm:migration:run": "typeorm migration:run",
     "typeorm:migration:revert": "typeorm migration:revert",
-    "db:seed": "ts-node src/database/seeds/index.ts",
-    "db:reset": "npm run typeorm:migration:revert && npm run typeorm:migration:run",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:resolve": "prisma migrate resolve",
+    "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:studio": "prisma studio",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --force",
+    "db:verify": "prisma db execute --stdin < scripts/verify-db.sql",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:build": "docker build -t qgos:latest .",
     "docker:push": "docker push queckgrowofficel1-crypto/qgos:latest"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.3",
