@@ -47,6 +47,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: development
+      HOST: 0.0.0.0
       DATABASE_URL: postgresql://qgos:qgos@postgres:5432/qgos_dev
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
@@ -56,6 +57,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: dev-secret-change-in-production
+      ADMIN_INITIAL_PASSWORD: dev-admin-password-change-me
       PORT: 3000
     ports:
       - "3000:3000"
