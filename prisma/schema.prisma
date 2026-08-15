@@ -11,7 +11,7 @@ datasource db {
 }
 
 // ============================================================================
-// ENUMS
+// PHASE 1: FINTECH ENUMS (UNCHANGED)
 // ============================================================================
 
 enum UserStatus {
@@ -161,7 +161,112 @@ enum AuditLogAction {
 }
 
 // ============================================================================
-// CORE USER MODELS
+// PHASE 2: AI OPERATING SYSTEM ENUMS
+// ============================================================================
+
+enum AIModelProvider {
+  OPENAI
+  ANTHROPIC
+  OPENROUTER
+  LOCAL
+  HUGGINGFACE
+}
+
+enum AIModelType {
+  LLM
+  EMBEDDING
+  IMAGE
+  AUDIO
+  TEXT_TO_SPEECH
+}
+
+enum WorkspaceStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum AIAgentType {
+  ASSISTANT
+  SPECIALIST
+  ORCHESTRATOR
+  TOOL
+}
+
+enum AIAgentStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+  TESTING
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum WorkflowStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  DEPRECATED
+}
+
+enum WorkflowTriggerType {
+  MANUAL
+  SCHEDULED
+  WEBHOOK
+  EVENT
+  API
+}
+
+enum WorkflowExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+enum TaskType {
+  AGENT_CALL
+  WEBHOOK
+  DATA_FETCH
+  TRANSFORM
+  CONDITION
+}
+
+enum TaskStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum DocumentStatus {
+  DRAFT
+  PROCESSING
+  READY
+  ERROR
+}
+
+enum APIKeyType {
+  PERSONAL
+  SERVICE
+  WEBHOOK
+}
+
+// ============================================================================
+// PHASE 1: CORE USER MODELS (UNCHANGED)
 // ============================================================================
 
 model User {
@@ -191,7 +296,7 @@ model User {
   referrals         User[]      @relation("Referrals")
   referralCode      String?     @unique
 
-  // Relations
+  // Phase 1 Relations
   wallets           Wallet[]
   transactions      Transaction[]
   investments       Investment[]
@@ -215,6 +320,17 @@ model User {
   referralIncomes   ReferralIncome[]
   roles             Role[]
 
+  // Phase 2 AI-OS Relations
+  createdAgents      AIAgent[] @relation("AgentCreatedBy")
+  agentVersions      AIAgentVersion[] @relation("VersionCreatedBy")
+  conversations      Conversation[] @relation("ConversationUser")
+  uploadedDocuments  Document[] @relation("DocumentUploadedBy")
+  createdWorkflows   Workflow[] @relation("WorkflowCreatedBy")
+  workflowExecutions WorkflowExecution[] @relation("ExecutionBy")
+  apiKeys            APIKey[]
+  createdWorkspaces  Workspace[] @relation("WorkspaceOwner")
+  createdKnowledgeBases KnowledgeBase[] @relation("KnowledgeBaseCreatedBy")
+
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   deletedAt         DateTime?
@@ -229,7 +345,7 @@ model User {
 }
 
 // ============================================================================
-// WALLET & TRANSACTION MODELS
+// PHASE 1: WALLET & TRANSACTION MODELS (UNCHANGED)
 // ============================================================================
 
 model Wallet {
@@ -300,7 +416,7 @@ model Transaction {
 }
 
 // ============================================================================
-// INVESTMENT & PACKAGE MODELS
+// PHASE 1: INVESTMENT & PACKAGE MODELS (UNCHANGED)
 // ============================================================================
 
 model Package {
@@ -369,7 +485,7 @@ model Investment {
 }
 
 // ============================================================================
-// INCOME MODELS
+// PHASE 1: INCOME MODELS (UNCHANGED)
 // ============================================================================
 
 model ReferralIncome {
@@ -469,7 +585,7 @@ model RankReward {
 }
 
 // ============================================================================
-// WITHDRAWAL & DEPOSIT MODELS
+// PHASE 1: WITHDRAWAL & DEPOSIT MODELS (UNCHANGED)
 // ============================================================================
 
 model Withdrawal {
@@ -548,7 +664,7 @@ model Deposit {
 }
 
 // ============================================================================
-// KYC & VERIFICATION MODELS
+// PHASE 1: KYC & VERIFICATION MODELS (UNCHANGED)
 // ============================================================================
 
 model KYC {
@@ -622,7 +738,7 @@ model OTP {
 }
 
 // ============================================================================
-// SESSION & NOTIFICATION MODELS
+// PHASE 1: SESSION & NOTIFICATION MODELS (UNCHANGED)
 // ============================================================================
 
 model Session {
@@ -676,7 +792,7 @@ model Notification {
 }
 
 // ============================================================================
-// AUDIT & ADMIN MODELS
+// PHASE 1: AUDIT & ADMIN MODELS (UNCHANGED)
 // ============================================================================
 
 model AuditLog {
@@ -763,4 +879,436 @@ model Setting {
   @@index([key])
   @@index([category])
   @@map("settings")
+}
+
+// ============================================================================
+// PHASE 2: AI OPERATING SYSTEM MODELS
+// ============================================================================
+
+// ============================================================================
+// Workspace & Tenant Foundation
+// ============================================================================
+
+model Workspace {
+  id                String            @id @default(cuid())
+  name              String
+  slug              String            @unique
+  description       String?
+  ownerId           String
+  owner             User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  status            WorkspaceStatus   @default(ACTIVE)
+  isDefault         Boolean           @default(false)
+  settings          Json              @default("{}")
+
+  // Relations
+  agents            AIAgent[]
+  conversations     Conversation[]
+  workflows         Workflow[]
+  knowledgeBases    KnowledgeBase[]
+  apiKeys           APIKey[]
+  webhooks          WebhookEndpoint[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("workspaces")
+}
+
+// ============================================================================
+// AI Provider & Model Management
+// ============================================================================
+
+model AIModel {
+  id                String            @id @default(cuid())
+  name              String            @unique
+  provider          AIModelProvider
+  version           String
+  type              AIModelType
+  description       String?
+
+  inputTokenLimit   Int?
+  outputTokenLimit  Int?
+  costPerInputToken Decimal?          @db.Decimal(10, 8)
+  costPerOutputToken Decimal?         @db.Decimal(10, 8)
+  
+  isAvailable       Boolean           @default(true)
+  metadata          Json?
+
+  // Relations
+  agentVersions     AIAgentVersion[]
+  messages          Message[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([provider])
+  @@index([type])
+  @@index([isAvailable])
+  @@map("ai_models")
+}
+
+// ============================================================================
+// AI Agent Management
+// ============================================================================
+
+model AIAgent {
+  id                String            @id @default(cuid())
+  name              String
+  slug              String
+  description       String?
+  workspaceId       String
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy         String
+  createdByUser     User              @relation("AgentCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  type              AIAgentType       @default(ASSISTANT)
+  status            AIAgentStatus     @default(DRAFT)
+  systemPrompt      String            @db.Text
+  settings          Json              @default("{}")
+  knowledgeBaseIds  String[]          @default([])
+  currentVersionId  String?
+
+  // Relations
+  versions          AIAgentVersion[]
+  conversations     Conversation[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([status])
+  @@map("ai_agents")
+}
+
+model AIAgentVersion {
+  id                String            @id @default(cuid())
+  agentId           String
+  agent             AIAgent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  versionNumber     Int
+  systemPrompt      String            @db.Text
+  settings          Json
+  modelId           String
+  model             AIModel           @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  createdBy         String
+  createdByUser     User              @relation("VersionCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  changeLog         String?
+  isPublished       Boolean           @default(false)
+
+  createdAt         DateTime          @default(now())
+
+  @@unique([agentId, versionNumber])
+  @@index([agentId])
+  @@index([modelId])
+  @@map("ai_agent_versions")
+}
+
+// ============================================================================
+// Conversation & Message Management
+// ============================================================================
+
+model Conversation {
+  id                String            @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User              @relation("ConversationUser", fields: [userId], references: [id], onDelete: Cascade)
+  agentId           String?
+  agent             AIAgent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  title             String
+  summary           String?
+  status            ConversationStatus @default(ACTIVE)
+  messageCount      Int               @default(0)
+  lastActivityAt    DateTime          @updatedAt
+
+  // Relations
+  messages          Message[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([agentId])
+  @@index([status])
+  @@map("conversations")
+}
+
+model Message {
+  id                String            @id @default(cuid())
+  conversationId    String
+  conversation      Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role              MessageRole
+  content           String            @db.Text
+  tokens            Int?
+  modelId           String?
+  model             AIModel?          @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  metadata          Json?
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([conversationId])
+  @@index([role])
+  @@map("messages")
+}
+
+// ============================================================================
+// Workflow & Task Execution
+// ============================================================================
+
+model Workflow {
+  id                String            @id @default(cuid())
+  name              String
+  slug              String            @unique
+  description       String?
+  workspaceId       String
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy         String
+  createdByUser     User              @relation("WorkflowCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  status            WorkflowStatus    @default(DRAFT)
+  triggerType       WorkflowTriggerType @default(MANUAL)
+  definition        String            @db.Text // JSON DAG
+  cronExpression    String?
+  isActive          Boolean           @default(true)
+
+  // Relations
+  executions        WorkflowExecution[]
+  tasks             Task[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  @@index([workspaceId])
+  @@index([status])
+  @@map("workflows")
+}
+
+model WorkflowExecution {
+  id                String                @id @default(cuid())
+  workflowId        String
+  workflow          Workflow              @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  status            WorkflowExecutionStatus @default(PENDING)
+  input             Json?
+  output            Json?
+  error             String?
+  executedBy        String?
+  executedByUser    User?                 @relation("ExecutionBy", fields: [executedBy], references: [id], onDelete: SetNull)
+
+  startedAt         DateTime              @default(now())
+  completedAt       DateTime?
+  durationMs        Int?
+
+  // Relations
+  tasks             Task[]
+
+  createdAt         DateTime              @default(now())
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("workflow_executions")
+}
+
+model Task {
+  id                String                @id @default(cuid())
+  executionId       String
+  execution         WorkflowExecution     @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  workflowId        String
+  workflow          Workflow              @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  taskType          TaskType
+  taskName          String
+  status            TaskStatus            @default(PENDING)
+  input             Json?
+  output            Json?
+  error             String?
+  
+  startedAt         DateTime              @default(now())
+  completedAt       DateTime?
+  durationMs        Int?
+  retryCount        Int                   @default(0)
+
+  createdAt         DateTime              @default(now())
+
+  @@index([executionId])
+  @@index([workflowId])
+  @@index([status])
+  @@map("tasks")
+}
+
+// ============================================================================
+// Knowledge Base & Document Management
+// ============================================================================
+
+model KnowledgeBase {
+  id                String            @id @default(cuid())
+  name              String
+  slug              String            @unique
+  workspaceId       String
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  description       String?
+  createdBy         String
+  createdByUser     User              @relation("KnowledgeBaseCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  documentCount     Int               @default(0)
+  embeddingModel    String?
+  isPublic          Boolean           @default(false)
+
+  // Relations
+  documents         KnowledgeBaseDocument[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  @@index([workspaceId])
+  @@map("knowledge_bases")
+}
+
+model Document {
+  id                String            @id @default(cuid())
+  title             String
+  workspaceId       String
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedBy        String
+  uploadedByUser    User              @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  mimeType          String
+  fileSize          BigInt
+  storagePath       String
+  status            DocumentStatus    @default(PROCESSING)
+  embedding         String?
+  currentVersionId  String?
+
+  // Relations
+  versions          DocumentVersion[]
+  knowledgeBases    KnowledgeBaseDocument[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  @@index([workspaceId])
+  @@index([status])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id                String            @id @default(cuid())
+  documentId        String
+  document          Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionNumber     Int
+  fileSize          BigInt
+  storagePath       String
+  createdBy         String
+
+  changeLog         String?
+
+  createdAt         DateTime          @default(now())
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+  @@map("document_versions")
+}
+
+model KnowledgeBaseDocument {
+  id                String            @id @default(cuid())
+  knowledgeBaseId   String
+  knowledgeBase     KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  documentId        String
+  document          Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([knowledgeBaseId, documentId])
+  @@index([knowledgeBaseId])
+  @@index([documentId])
+  @@map("knowledge_base_documents")
+}
+
+// ============================================================================
+// API & Webhook Integration
+// ============================================================================
+
+model APIKey {
+  id                String            @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId            String?
+  user              User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  name              String
+  keyHash           String            @unique
+  type              APIKeyType        @default(PERSONAL)
+  permissions       String[]          @default([])
+  
+  lastUsedAt        DateTime?
+  expiresAt         DateTime?
+  isActive          Boolean           @default(true)
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  @@index([workspaceId])
+  @@index([keyHash])
+  @@index([type])
+  @@index([isActive])
+  @@map("api_keys")
+}
+
+model WebhookEndpoint {
+  id                String            @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  url               String
+  events            String[]          @default([])
+  isActive          Boolean           @default(true)
+  secret            String
+  
+  retryCount        Int               @default(3)
+  retryDelaySeconds Int               @default(60)
+  lastTriggeredAt   DateTime?
+
+  // Relations
+  logs              WebhookLog[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([workspaceId, url])
+  @@index([workspaceId])
+  @@map("webhook_endpoints")
+}
+
+model WebhookLog {
+  id                String            @id @default(cuid())
+  webhookEndpointId String
+  webhookEndpoint   WebhookEndpoint   @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+
+  event             String
+  payload           String            @db.Text
+  httpStatus        Int?
+  response          String?
+  attempt           Int               @default(1)
+  nextRetryAt       DateTime?
+  succeededAt       DateTime?
+
+  createdAt         DateTime          @default(now())
+
+  @@index([webhookEndpointId])
+  @@index([succeededAt])
+  @@map("webhook_logs")
 }
