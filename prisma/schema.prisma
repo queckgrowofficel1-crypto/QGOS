@@ -317,7 +317,8 @@ model User {
   binaryIncome      BinaryIncome[]
   matchingIncome    MatchingIncome[]
   rankRewards       RankReward[]
-  referralIncomes   ReferralIncome[]
+  referralIncomes   ReferralIncome[] @relation("ReferralIncomeUser")
+  referredReferralIncomes ReferralIncome[] @relation("ReferralIncomeReferrer")
   roles             Role[]
 
   // Phase 2 AI-OS Relations
@@ -491,9 +492,9 @@ model Investment {
 model ReferralIncome {
   id                String          @id @default(cuid())
   userId            String
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User            @relation("ReferralIncomeUser", fields: [userId], references: [id], onDelete: Cascade)
   referralUserId    String
-  referralUser      User?           @relation(fields: [referralUserId], references: [id], onDelete: SetNull)
+  referralUser      User?           @relation("ReferralIncomeReferrer", fields: [referralUserId], references: [id], onDelete: SetNull)
 
   amount            Decimal         @db.Decimal(18, 8)
   percentage        Decimal         @default(0) @db.Decimal(5, 2)
