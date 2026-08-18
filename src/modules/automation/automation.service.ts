@@ -8,9 +8,17 @@ export interface AutomationDefinition extends AutomationRecord {}
 export class AutomationService {
   constructor(private readonly store: AutomationStore) {}
 
-  list(): AutomationDefinition[] { return this.store.all(); }
+  async list(): Promise<AutomationDefinition[]> {
+    return this.store.all();
+  }
 
-  create(input: Omit<AutomationDefinition, 'id' | 'createdAt' | 'updatedAt'>): AutomationDefinition {
+  async get(id: string): Promise<AutomationDefinition> {
+    const definition = await this.store.get(id);
+    if (!definition) throw new NotFoundException('Automation not found');
+    return definition;
+  }
+
+  async create(input: Omit<AutomationDefinition, 'id' | 'createdAt' | 'updatedAt'>): Promise<AutomationDefinition> {
     const now = new Date().toISOString();
     const definition: AutomationDefinition = {
       id: `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -21,12 +29,16 @@ export class AutomationService {
     return this.store.save(definition);
   }
 
-  activate(id: string): AutomationDefinition { return this.transition(id, 'ACTIVE'); }
-  pause(id: string): AutomationDefinition { return this.transition(id, 'PAUSED'); }
+  async activate(id: string): Promise<AutomationDefinition> {
+    return this.transition(id, 'ACTIVE');
+  }
 
-  private transition(id: string, status: AutomationStatus): AutomationDefinition {
-    const definition = this.store.get(id);
-    if (!definition) throw new NotFoundException('Automation not found');
+  async pause(id: string): Promise<AutomationDefinition> {
+    return this.transition(id, 'PAUSED');
+  }
+
+  private async transition(id: string, status: AutomationStatus): Promise<AutomationDefinition> {
+    const definition = await this.get(id);
     definition.status = status;
     definition.updatedAt = new Date().toISOString();
     return this.store.save(definition);
