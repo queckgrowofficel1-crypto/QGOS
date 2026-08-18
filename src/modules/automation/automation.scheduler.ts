@@ -15,10 +15,14 @@ export class AutomationScheduler implements OnModuleDestroy {
   schedule(id: string, delayMs: number): void {
     this.cancel(id);
     const timer = setTimeout(async () => {
-      const definition = this.automation.list().find((item) => item.id === id);
-      if (!definition || definition.status !== 'ACTIVE') return;
-      await this.executor.execute(definition);
-      this.timers.delete(id);
+      try {
+        const definition = await this.automation.get(id);
+        if (definition.status === 'ACTIVE') await this.executor.execute(definition);
+      } catch (error) {
+        this.logger.error(`Scheduled automation ${id} failed`, error instanceof Error ? error.stack : undefined);
+      } finally {
+        this.timers.delete(id);
+      }
     }, Math.max(0, delayMs));
     this.timers.set(id, timer);
   }
