@@ -2,9 +2,9 @@ name: QGOS CI
 
 on:
   push:
-    branches: [main, phase-1-foundation, phase-2-database]
+    branches: [main, phase-1-foundation, phase-2-database, phase-3-ai-os]
   pull_request:
-    branches: [main]
+    branches: [main, phase-2-database]
 
 jobs:
   validate:
