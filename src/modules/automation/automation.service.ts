@@ -1,41 +1,34 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { AutomationStore, AutomationRecord } from './automation.store';
 
 export type AutomationStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED';
-
-export interface AutomationDefinition {
-  id: string;
-  name: string;
-  status: AutomationStatus;
-  trigger: string;
-  actions: string[];
-}
+export interface AutomationDefinition extends AutomationRecord {}
 
 @Injectable()
 export class AutomationService {
-  private readonly definitions = new Map<string, AutomationDefinition>();
+  constructor(private readonly store: AutomationStore) {}
 
-  list(): AutomationDefinition[] {
-    return [...this.definitions.values()];
+  list(): AutomationDefinition[] { return this.store.all(); }
+
+  create(input: Omit<AutomationDefinition, 'id' | 'createdAt' | 'updatedAt'>): AutomationDefinition {
+    const now = new Date().toISOString();
+    const definition: AutomationDefinition = {
+      id: `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      ...input,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return this.store.save(definition);
   }
 
-  create(input: Omit<AutomationDefinition, 'id'>): AutomationDefinition {
-    const id = `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const definition = { id, ...input };
-    this.definitions.set(id, definition);
-    return definition;
-  }
+  activate(id: string): AutomationDefinition { return this.transition(id, 'ACTIVE'); }
+  pause(id: string): AutomationDefinition { return this.transition(id, 'PAUSED'); }
 
-  activate(id: string): AutomationDefinition {
-    const definition = this.definitions.get(id);
-    if (!definition) throw new Error('Automation not found');
-    definition.status = 'ACTIVE';
-    return definition;
-  }
-
-  pause(id: string): AutomationDefinition {
-    const definition = this.definitions.get(id);
-    if (!definition) throw new Error('Automation not found');
-    definition.status = 'PAUSED';
-    return definition;
+  private transition(id: string, status: AutomationStatus): AutomationDefinition {
+    const definition = this.store.get(id);
+    if (!definition) throw new NotFoundException('Automation not found');
+    definition.status = status;
+    definition.updatedAt = new Date().toISOString();
+    return this.store.save(definition);
   }
 }
