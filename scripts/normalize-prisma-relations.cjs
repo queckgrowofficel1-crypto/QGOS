@@ -13,15 +13,16 @@ schema = schema.replace(
   '  user              User            @relation("ReferralIncomeUser", fields: [userId], references: [id], onDelete: Cascade)\n  referralUserId    String\n  referralUser      User?           @relation("ReferralIncomeSource", fields: [referralUserId], references: [id], onDelete: SetNull)',
 );
 
-// Normalize binary-tree self relations. Each named self relation needs an
-// explicit opposite field on User; otherwise Prisma raises P1012.
+// Normalize binary-tree self relations. The inverse sides are arrays so the
+// existing optional FK fields remain valid without introducing one-to-one
+// uniqueness requirements.
 schema = schema.replace(
   '  binaryLeftChildId String?\n',
-  '  binaryLeftChildId String?\n  binaryLeftParent User? @relation("BinaryLeft")\n',
+  '  binaryLeftChildId String?\n  binaryLeftParents User[] @relation("BinaryLeft")\n',
 );
 schema = schema.replace(
   '  binaryRightChildId String?\n',
-  '  binaryRightChildId String?\n  binaryRightParent User? @relation("BinaryRight")\n',
+  '  binaryRightChildId String?\n  binaryRightParents User[] @relation("BinaryRight")\n',
 );
 
 fs.writeFileSync(path, schema);
