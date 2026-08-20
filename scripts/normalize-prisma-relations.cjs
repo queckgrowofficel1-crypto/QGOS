@@ -25,5 +25,19 @@ schema = schema.replace(
   '  binaryRightChildId String?\n  binaryRightParents User[] @relation("BinaryRight")\n',
 );
 
+// Normalize missing inverse relations reported by Prisma validation.
+schema = schema.replace(
+  '  isActive          Boolean     @default(true)\n',
+  '  isActive          Boolean     @default(true)\n  transactions      Transaction[]\n',
+);
+schema = schema.replace(
+  '  displayOrder      Int             @default(0)\n',
+  '  displayOrder      Int             @default(0)\n  investments       Investment[]\n',
+);
+schema = schema.replace(
+  '  webhooks          WebhookEndpoint[]\n',
+  '  webhooks          WebhookEndpoint[]\n  documents         Document[]\n',
+);
+
 fs.writeFileSync(path, schema);
-console.log('Normalized legacy Prisma ReferralIncome and binary self-relations for validation.');
+console.log('Normalized legacy Prisma relations for validation.');
