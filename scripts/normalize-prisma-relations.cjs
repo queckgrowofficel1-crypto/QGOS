@@ -25,5 +25,19 @@ schema = schema.replace(
   '  binaryRightChildId String?\n  binaryRightParents User[] @relation("BinaryRight")\n',
 );
 
+// Add missing inverse relations reported by Prisma validation.
+schema = schema.replace(
+  '  lastTransactionAt DateTime?\n',
+  '  lastTransactionAt DateTime?\n  transactions      Transaction[]\n',
+);
+schema = schema.replace(
+  '  displayOrder      Int             @default(0)\n',
+  '  displayOrder      Int             @default(0)\n  investments       Investment[]\n',
+);
+schema = schema.replace(
+  '  knowledgeBases    KnowledgeBase[]\n',
+  '  knowledgeBases    KnowledgeBase[]\n  documents         Document[]\n',
+);
+
 fs.writeFileSync(path, schema);
-console.log('Normalized legacy Prisma ReferralIncome and binary self-relations for validation.');
+console.log('Normalized legacy Prisma relations for validation.');
