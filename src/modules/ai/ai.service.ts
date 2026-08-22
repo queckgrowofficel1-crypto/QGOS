@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MessageRole } from '@prisma/client';
+import { MessageRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -40,7 +40,14 @@ export class AIService {
     if (!conversation) throw new NotFoundException('Conversation not found');
     if (input.modelId) await this.ensureModel(input.modelId);
     return this.prisma.$transaction(async (tx) => {
-      const message = await tx.message.create({ data: { conversationId, ...input } });
+      const { metadata, ...messageInput } = input;
+      const message = await tx.message.create({
+        data: {
+          conversationId,
+          ...messageInput,
+          ...(metadata === undefined ? {} : { metadata: metadata as Prisma.InputJsonValue }),
+        },
+      });
       await tx.conversation.update({ where: { id: conversationId }, data: { messageCount: { increment: 1 } } });
       return message;
     });
