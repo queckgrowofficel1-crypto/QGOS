@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface AutomationRecord {
@@ -31,16 +32,17 @@ export class AutomationStore {
   }
 
   async save(record: AutomationRecord): Promise<AutomationRecord> {
+    const value = record as unknown as Prisma.InputJsonValue;
     await this.prisma.setting.upsert({
       where: { key: `${PREFIX}${record.id}` },
       create: {
         key: `${PREFIX}${record.id}`,
-        value: record,
+        value,
         category: 'automation',
         description: `Automation definition: ${record.name}`,
       },
       update: {
-        value: record,
+        value,
         category: 'automation',
         description: `Automation definition: ${record.name}`,
       },
