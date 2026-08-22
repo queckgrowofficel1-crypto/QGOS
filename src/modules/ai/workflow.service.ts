@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { WorkflowExecutionStatus, WorkflowStatus, WorkflowTriggerType } from '@prisma/client';
+import { Prisma, WorkflowExecutionStatus, WorkflowStatus, WorkflowTriggerType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -27,7 +27,13 @@ export class WorkflowService {
     const workflow = await this.prisma.workflow.findFirst({ where: { id, deletedAt: null, isActive: true } });
     if (!workflow) throw new NotFoundException('Workflow not found or inactive');
     if (workflow.status !== WorkflowStatus.PUBLISHED) throw new NotFoundException('Workflow is not published');
-    return this.prisma.workflowExecution.create({ data: { workflowId: id, status: WorkflowExecutionStatus.PENDING, input } });
+    return this.prisma.workflowExecution.create({
+      data: {
+        workflowId: id,
+        status: WorkflowExecutionStatus.PENDING,
+        ...(input === undefined ? {} : { input: input as Prisma.InputJsonValue }),
+      },
+    });
   }
 
   private async ensureWorkspace(id: string) {
