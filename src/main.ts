@@ -2,8 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as compression from 'compression';
-import * as helmet from 'helmet';
+import compression = require('compression');
+import helmet = require('helmet');
 import { AppModule } from './app.module';
 
 async function bootstrap() {
