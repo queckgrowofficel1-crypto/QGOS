@@ -1,11 +1,15 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { WalletType } from '@prisma/client';
-import { CreateInvestmentDto, CreateWithdrawalDto, WalletOperationDto, WithdrawalDecisionDto } from './financial.dto';
+import { CreateInvestmentDto, CreateWithdrawalDto, DistributeReferralIncomeDto, WalletOperationDto, WithdrawalDecisionDto } from './financial.dto';
 import { FinancialService } from './financial.service';
+import { IncomeService } from './income.service';
 
 @Controller('financial')
 export class FinancialController {
-  constructor(private readonly financial: FinancialService) {}
+  constructor(
+    private readonly financial: FinancialService,
+    private readonly income: IncomeService,
+  ) {}
 
   @Get('wallets/:userId/:type') wallet(@Param('userId') userId: string, @Param('type') type: WalletType) { return this.financial.getWallet(userId, type); }
   @Get('wallets/:userId/:type/history') history(@Param('userId') userId: string, @Param('type') type: WalletType) { return this.financial.history(userId, type); }
@@ -19,4 +23,7 @@ export class FinancialController {
   @Post('withdrawals/:id/approve') approveWithdrawal(@Param('id') id: string, @Body() body: WithdrawalDecisionDto) { return this.financial.approveWithdrawal(id, body); }
   @Post('withdrawals/:id/reject') rejectWithdrawal(@Param('id') id: string, @Body() body: WithdrawalDecisionDto) { return this.financial.rejectWithdrawal(id, body); }
   @Post('withdrawals/:id/complete') completeWithdrawal(@Param('id') id: string) { return this.financial.completeWithdrawal(id); }
+
+  @Get('income/:userId/history') incomeHistory(@Param('userId') userId: string) { return this.income.history(userId); }
+  @Post('income/referral/distribute') distributeReferralIncome(@Body() body: DistributeReferralIncomeDto) { return this.income.distributeReferralIncome(body); }
 }
