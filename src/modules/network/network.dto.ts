@@ -6,6 +6,12 @@ export class AssignReferrerDto {
   referrerId!: string;
 }
 
+export class AssignReferralCodeDto {
+  @IsString()
+  @IsNotEmpty()
+  referralCode!: string;
+}
+
 export class NetworkQueryDto {
   @IsOptional()
   @Min(1)
