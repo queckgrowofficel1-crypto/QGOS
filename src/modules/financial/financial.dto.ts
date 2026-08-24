@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsNumberString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsNumberString, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { TransactionType, WalletType } from '@prisma/client';
 
 export class WalletOperationDto {
@@ -39,4 +39,12 @@ export class CreateWithdrawalDto {
 export class WithdrawalDecisionDto {
   @IsString() @IsNotEmpty() approvedBy!: string;
   @IsOptional() @IsString() @MaxLength(500) note?: string;
+}
+
+export class DistributeReferralIncomeDto {
+  @IsString() @IsNotEmpty() sourceUserId!: string;
+  @IsString() @IsNotEmpty() @IsNumberString() baseAmount!: string;
+  @IsString() @IsNotEmpty() @MaxLength(100) reference!: string;
+  @IsOptional() @IsString() @MaxLength(12) currency?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(5) maxLevels?: number;
 }
