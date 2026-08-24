@@ -6,43 +6,32 @@ export class NetworkService {
   constructor(private readonly prisma: PrismaService) {}
 
   async assignReferrer(userId: string, referrerId: string) {
-    if (userId === referrerId) {
-      throw new BadRequestException('A user cannot refer themselves');
-    }
-
+    if (userId === referrerId) throw new BadRequestException('A user cannot refer themselves');
     const [user, referrer] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, referrerId: true } }),
       this.prisma.user.findUnique({ where: { id: referrerId }, select: { id: true } }),
     ]);
-
     if (!user) throw new NotFoundException('User not found');
     if (!referrer) throw new NotFoundException('Referrer not found');
-    if (user.referrerId && user.referrerId !== referrerId) {
-      throw new BadRequestException('Referrer is already assigned');
-    }
+    if (user.referrerId && user.referrerId !== referrerId) throw new BadRequestException('Referrer is already assigned');
 
     let cursor: string | null = referrerId;
     const visited = new Set<string>();
     while (cursor) {
-      if (cursor === userId) {
-        throw new BadRequestException('Referral cycle is not allowed');
-      }
-      if (visited.has(cursor)) {
-        throw new BadRequestException('Existing referral cycle detected');
-      }
+      if (cursor === userId) throw new BadRequestException('Referral cycle is not allowed');
+      if (visited.has(cursor)) throw new BadRequestException('Existing referral cycle detected');
       visited.add(cursor);
-      const node = await this.prisma.user.findUnique({
-        where: { id: cursor },
-        select: { referrerId: true },
-      });
+      const node = await this.prisma.user.findUnique({ where: { id: cursor }, select: { referrerId: true } });
       cursor = node?.referrerId ?? null;
     }
 
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { referrerId },
-      select: { id: true, referrerId: true, updatedAt: true },
-    });
+    return this.prisma.user.update({ where: { id: userId }, data: { referrerId }, select: { id: true, referrerId: true, updatedAt: true } });
+  }
+
+  async assignReferralCode(userId: string, referralCode: string) {
+    const referrer = await this.prisma.user.findFirst({ where: { referralCode, deletedAt: null }, select: { id: true } });
+    if (!referrer) throw new NotFoundException('Referral code not found');
+    return this.assignReferrer(userId, referrer.id);
   }
 
   direct(userId: string) {
@@ -53,25 +42,34 @@ export class NetworkService {
     });
   }
 
-  async tree(userId: string, depth = 3) {
-    const root = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, fullName: true, username: true, referralCode: true },
-    });
+  async stats(userId: string, depth = 10) {
+    const root = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!root) throw new NotFoundException('User not found');
-    return { ...root, referrals: await this.children(userId, Math.min(Math.max(depth, 1), 10)) };
+    const levels: number[] = [];
+    let frontier = [userId];
+    const seen = new Set<string>(frontier);
+    for (let level = 1; level <= Math.min(Math.max(depth, 1), 10) && frontier.length; level += 1) {
+      const users = await this.prisma.user.findMany({ where: { referrerId: { in: frontier }, deletedAt: null }, select: { id: true } });
+      frontier = users.map((user) => user.id).filter((id) => !seen.has(id));
+      frontier.forEach((id) => seen.add(id));
+      levels.push(frontier.length);
+    }
+    return { userId, directCount: levels[0] ?? 0, totalTeamCount: levels.reduce((sum, count) => sum + count, 0), levels };
   }
 
-  private async children(referrerId: string, depth: number): Promise<unknown[]> {
+  async tree(userId: string, depth = 3) {
+    const root = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, fullName: true, username: true, referralCode: true } });
+    if (!root) throw new NotFoundException('User not found');
+    return { ...root, referrals: await this.children(userId, Math.min(Math.max(depth, 1), 10), new Set([userId])) };
+  }
+
+  private async children(referrerId: string, depth: number, visited: Set<string>): Promise<unknown[]> {
     if (depth <= 0) return [];
-    const users = await this.prisma.user.findMany({
-      where: { referrerId, deletedAt: null },
-      select: { id: true, fullName: true, username: true, referralCode: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    return Promise.all(users.map(async (user) => ({
-      ...user,
-      referrals: await this.children(user.id, depth - 1),
-    })));
+    const users = await this.prisma.user.findMany({ where: { referrerId, deletedAt: null }, select: { id: true, fullName: true, username: true, referralCode: true }, orderBy: { createdAt: 'asc' } });
+    return Promise.all(users.filter((user) => !visited.has(user.id)).map(async (user) => {
+      const nextVisited = new Set(visited);
+      nextVisited.add(user.id);
+      return { ...user, referrals: await this.children(user.id, depth - 1, nextVisited) };
+    }));
   }
 }
