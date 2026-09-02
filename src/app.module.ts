@@ -4,6 +4,8 @@ import { PrismaModule } from './modules/prisma/prisma.module';
 import { AIModule } from './modules/ai/ai.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { FinancialModule } from './modules/financial/financial.module';
+import { NetworkModule } from './modules/network/network.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -16,6 +18,8 @@ import { HealthController } from './health.controller';
     AIModule,
     AutomationModule,
     FinancialModule,
+    NetworkModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })
