@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AuditLogAction, Prisma, TransactionStatus, UserRole, UserStatus, WithdrawalStatus, InvestmentStatus } from '@prisma/client';
+import { AuditLogAction, Prisma, TransactionStatus, UserStatus, WithdrawalStatus, InvestmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FinancialService } from '../financial/financial.service';
 import { AdminWithdrawalDecisionDto, UpdateUserAdminDto } from './admin.dto';
