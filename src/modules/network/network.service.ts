@@ -21,7 +21,10 @@ export class NetworkService {
       if (cursor === userId) throw new BadRequestException('Referral cycle is not allowed');
       if (visited.has(cursor)) throw new BadRequestException('Existing referral cycle detected');
       visited.add(cursor);
-      const node = await this.prisma.user.findUnique({ where: { id: cursor }, select: { referrerId: true } });
+      const node: { referrerId: string | null } | null = await this.prisma.user.findUnique({
+        where: { id: cursor },
+        select: { referrerId: true },
+      });
       cursor = node?.referrerId ?? null;
     }
 
