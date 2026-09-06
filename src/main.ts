@@ -24,10 +24,16 @@ async function bootstrap() {
     }),
   );
 
-  const configuredOrigins = configService.get<string>('CORS_ORIGIN', 'http://localhost:3000');
-  const corsOrigins = configuredOrigins.split(',').map((origin) => origin.trim()).filter(Boolean);
-  if (isProduction && corsOrigins.length === 0) {
+  const configuredOrigins = configService.get<string>('CORS_ORIGIN');
+  if (isProduction && !configuredOrigins?.trim()) {
     throw new Error('CORS_ORIGIN must be configured in production');
+  }
+  const corsOrigins = (configuredOrigins ?? 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (corsOrigins.length === 0) {
+    throw new Error('At least one CORS origin must be configured');
   }
   app.enableCors({
     origin: corsOrigins,
