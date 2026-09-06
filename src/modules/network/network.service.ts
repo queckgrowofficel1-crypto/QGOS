@@ -7,28 +7,41 @@ export class NetworkService {
 
   async assignReferrer(userId: string, referrerId: string) {
     if (userId === referrerId) throw new BadRequestException('A user cannot refer themselves');
-    const [user, referrer] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, referrerId: true } }),
-      this.prisma.user.findUnique({ where: { id: referrerId }, select: { id: true } }),
-    ]);
-    if (!user) throw new NotFoundException('User not found');
-    if (!referrer) throw new NotFoundException('Referrer not found');
-    if (user.referrerId && user.referrerId !== referrerId) throw new BadRequestException('Referrer is already assigned');
 
-    let cursor: string | null = referrerId;
-    const visited = new Set<string>();
-    while (cursor) {
-      if (cursor === userId) throw new BadRequestException('Referral cycle is not allowed');
-      if (visited.has(cursor)) throw new BadRequestException('Existing referral cycle detected');
-      visited.add(cursor);
-      const node: { referrerId: string | null } | null = await this.prisma.user.findUnique({
-        where: { id: cursor },
-        select: { referrerId: true },
+    return this.prisma.$transaction(async (tx) => {
+      const [user, referrer] = await Promise.all([
+        tx.user.findUnique({ where: { id: userId }, select: { id: true, referrerId: true } }),
+        tx.user.findUnique({ where: { id: referrerId }, select: { id: true } }),
+      ]);
+      if (!user) throw new NotFoundException('User not found');
+      if (!referrer) throw new NotFoundException('Referrer not found');
+      if (user.referrerId && user.referrerId !== referrerId) throw new BadRequestException('Referrer is already assigned');
+      if (user.referrerId === referrerId) return { id: user.id, referrerId: user.referrerId, updatedAt: new Date() };
+
+      let cursor: string | null = referrerId;
+      const visited = new Set<string>();
+      while (cursor) {
+        if (cursor === userId) throw new BadRequestException('Referral cycle is not allowed');
+        if (visited.has(cursor)) throw new BadRequestException('Existing referral cycle detected');
+        visited.add(cursor);
+        const node: { referrerId: string | null } | null = await tx.user.findUnique({
+          where: { id: cursor },
+          select: { referrerId: true },
+        });
+        cursor = node?.referrerId ?? null;
+      }
+
+      const assigned = await tx.user.updateMany({
+        where: { id: userId, referrerId: null, deletedAt: null },
+        data: { referrerId },
       });
-      cursor = node?.referrerId ?? null;
-    }
-
-    return this.prisma.user.update({ where: { id: userId }, data: { referrerId }, select: { id: true, referrerId: true, updatedAt: true } });
+      if (assigned.count !== 1) {
+        const current = await tx.user.findUnique({ where: { id: userId }, select: { id: true, referrerId: true } });
+        if (current?.referrerId === referrerId) return { id: current.id, referrerId: current.referrerId, updatedAt: new Date() };
+        throw new BadRequestException('Referrer is already assigned');
+      }
+      return tx.user.findUniqueOrThrow({ where: { id: userId }, select: { id: true, referrerId: true, updatedAt: true } });
+    }, { isolationLevel: 'Serializable' });
   }
 
   async assignReferralCode(userId: string, referralCode: string) {
