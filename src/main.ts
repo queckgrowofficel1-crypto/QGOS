@@ -10,6 +10,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
+  const isProduction = configService.get<string>('NODE_ENV', 'development') === 'production';
 
   app.use(helmet());
   app.use(compression());
@@ -23,30 +24,36 @@ async function bootstrap() {
     }),
   );
 
-  const corsOrigin = configService.get<string>('CORS_ORIGIN', 'http://localhost:3000');
+  const configuredOrigins = configService.get<string>('CORS_ORIGIN', 'http://localhost:3000');
+  const corsOrigins = configuredOrigins.split(',').map((origin) => origin.trim()).filter(Boolean);
+  if (isProduction && corsOrigins.length === 0) {
+    throw new Error('CORS_ORIGIN must be configured in production');
+  }
   app.enableCors({
-    origin: corsOrigin.split(',').map((origin) => origin.trim()),
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('QGOS API')
-    .setDescription('QueckGrow AI Operating System - Enterprise API')
-    .setVersion('1.0.0')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
-    .build();
-
-  SwaggerModule.setup('api', app, SwaggerModule.createDocument(app, config));
+  if (!isProduction || configService.get<string>('ENABLE_SWAGGER', 'false') === 'true') {
+    const config = new DocumentBuilder()
+      .setTitle('QGOS API')
+      .setDescription('QueckGrow AI Operating System - Enterprise API')
+      .setVersion('1.0.0')
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
+      .build();
+    SwaggerModule.setup('api', app, SwaggerModule.createDocument(app, config));
+  }
 
   const port = configService.get<number>('PORT', 3000);
   const host = configService.get<string>('HOST', '0.0.0.0');
-
   await app.listen(port, host);
 
   logger.log(`Application is running on: http://${host}:${port}`);
-  logger.log(`API documentation available at: http://${host}:${port}/api`);
+  if (!isProduction || configService.get<string>('ENABLE_SWAGGER', 'false') === 'true') {
+    logger.log(`API documentation available at: http://${host}:${port}/api`);
+  }
 }
 
 bootstrap().catch((err) => {
