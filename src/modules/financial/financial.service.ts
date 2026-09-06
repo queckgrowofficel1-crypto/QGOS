@@ -44,13 +44,21 @@ export class FinancialService {
       if (pkg.maxInvestors !== null && pkg.currentInvestors >= pkg.maxInvestors) throw new BadRequestException('Package investor limit reached');
       const wallet = await tx.wallet.findUnique({ where: { userId_type: { userId: input.userId, type: input.walletType } } });
       if (!wallet || wallet.deletedAt || !wallet.isActive) throw new NotFoundException('Active wallet not found');
-      if (wallet.balance.lt(amount)) throw new BadRequestException('Insufficient wallet balance');
       const investmentDate = new Date();
       const maturityDate = new Date(investmentDate.getTime() + pkg.maturityPeriodDays * 86400000);
+      const debited = await tx.wallet.updateMany({
+        where: { id: wallet.id, isActive: true, deletedAt: null, balance: { gte: amount } },
+        data: { balance: { decrement: amount }, lastTransactionAt: investmentDate },
+      });
+      if (debited.count !== 1) throw new BadRequestException('Insufficient wallet balance');
       const investment = await tx.investment.create({ data: { userId: input.userId, packageId: pkg.id, amount, status: InvestmentStatus.ACTIVE, dailyROI: pkg.dailyROI, monthlyROI: pkg.monthlyROI, yearlyROI: pkg.yearlyROI, investmentDate, maturityDate } });
-      await tx.wallet.update({ where: { id: wallet.id }, data: { balance: { decrement: amount }, lastTransactionAt: investmentDate } });
+      if (pkg.maxInvestors !== null) {
+        const capacity = await tx.package.updateMany({ where: { id: pkg.id, currentInvestors: { lt: pkg.maxInvestors } }, data: { currentInvestors: { increment: 1 } } });
+        if (capacity.count !== 1) throw new BadRequestException('Package investor limit reached');
+      } else {
+        await tx.package.update({ where: { id: pkg.id }, data: { currentInvestors: { increment: 1 } } });
+      }
       await tx.transaction.create({ data: { userId: input.userId, walletId: wallet.id, investmentId: investment.id, type: TransactionType.INVESTMENT, status: TransactionStatus.COMPLETED, amount, fee: new Prisma.Decimal(0), netAmount: amount, currency: input.currency ?? wallet.currency, reference: input.reference, processedAt: investmentDate } });
-      await tx.package.update({ where: { id: pkg.id }, data: { currentInvestors: { increment: 1 } } });
       return tx.investment.findUnique({ where: { id: investment.id }, include: { package: true } });
     });
   }
@@ -68,11 +76,14 @@ export class FinancialService {
       if (!user) throw new NotFoundException('User not found');
       const wallet = await tx.wallet.findUnique({ where: { userId_type: { userId: input.userId, type: input.walletType } } });
       if (!wallet || wallet.deletedAt || !wallet.isActive) throw new NotFoundException('Active wallet not found');
-      if (wallet.balance.lt(amount)) throw new BadRequestException('Insufficient wallet balance');
       if (!input.cryptoAddress && !input.bankAccountNumber) throw new BadRequestException('A crypto address or bank account is required');
       const now = new Date();
+      const debited = await tx.wallet.updateMany({
+        where: { id: wallet.id, isActive: true, deletedAt: null, balance: { gte: amount } },
+        data: { balance: { decrement: amount }, lastTransactionAt: now },
+      });
+      if (debited.count !== 1) throw new BadRequestException('Insufficient wallet balance');
       const withdrawal = await tx.withdrawal.create({ data: { userId: input.userId, status: WithdrawalStatus.PENDING, amount, fee: new Prisma.Decimal(0), netAmount: amount, currency: input.currency ?? wallet.currency, paymentMethod: input.paymentMethod, cryptoAddress: input.cryptoAddress, cryptoNetwork: input.cryptoNetwork, bankAccountName: input.bankAccountName, bankAccountNumber: input.bankAccountNumber, bankName: input.bankName, bankCode: input.bankCode, bankCountry: input.bankCountry } });
-      await tx.wallet.update({ where: { id: wallet.id }, data: { balance: { decrement: amount }, lastTransactionAt: now } });
       await tx.transaction.create({ data: { userId: input.userId, walletId: wallet.id, withdrawalId: withdrawal.id, type: TransactionType.WITHDRAWAL, status: TransactionStatus.PENDING, amount, fee: new Prisma.Decimal(0), netAmount: amount, currency: input.currency ?? wallet.currency, reference: input.reference } });
       return withdrawal;
     });
@@ -80,13 +91,15 @@ export class FinancialService {
 
   async approveWithdrawal(id: string, input: WithdrawalDecisionDto) {
     return this.prisma.$transaction(async (tx) => {
-      const withdrawal = await tx.withdrawal.findFirst({ where: { id, deletedAt: null } });
-      if (!withdrawal) throw new NotFoundException('Withdrawal not found');
-      if (withdrawal.status !== WithdrawalStatus.PENDING) throw new BadRequestException('Only pending withdrawals can be approved');
       const now = new Date();
-      const updated = await tx.withdrawal.update({ where: { id }, data: { status: WithdrawalStatus.APPROVED, approvedBy: input.approvedBy, approvalNote: input.note, approvedAt: now } });
-      await tx.transaction.updateMany({ where: { withdrawalId: id, status: TransactionStatus.PENDING }, data: { status: TransactionStatus.PROCESSING } });
-      return updated;
+      const updated = await tx.withdrawal.updateMany({ where: { id, deletedAt: null, status: WithdrawalStatus.PENDING }, data: { status: WithdrawalStatus.APPROVED, approvedBy: input.approvedBy, approvalNote: input.note, approvedAt: now } });
+      if (updated.count !== 1) {
+        const current = await tx.withdrawal.findFirst({ where: { id, deletedAt: null } });
+        if (!current) throw new NotFoundException('Withdrawal not found');
+        throw new BadRequestException('Only pending withdrawals can be approved');
+      }
+      await tx.transaction.updateMany({ where: { withdrawalId: id, status: TransactionStatus.PENDING, deletedAt: null }, data: { status: TransactionStatus.PROCESSING } });
+      return tx.withdrawal.findUnique({ where: { id } });
     });
   }
 
@@ -95,7 +108,7 @@ export class FinancialService {
       const withdrawal = await tx.withdrawal.findFirst({ where: { id, deletedAt: null } });
       if (!withdrawal) throw new NotFoundException('Withdrawal not found');
       if (withdrawal.status !== WithdrawalStatus.PENDING) throw new BadRequestException('Only pending withdrawals can be rejected');
-      const transaction = await tx.transaction.findFirst({ where: { withdrawalId: id, deletedAt: null } });
+      const transaction = await tx.transaction.findFirst({ where: { withdrawalId: id, deletedAt: null, status: TransactionStatus.PENDING } });
       if (!transaction) throw new NotFoundException('Withdrawal transaction not found');
       const now = new Date();
       await tx.wallet.update({ where: { id: transaction.walletId }, data: { balance: { increment: withdrawal.amount }, lastTransactionAt: now } });
@@ -112,7 +125,7 @@ export class FinancialService {
       const now = new Date();
       const transaction = await tx.transaction.findFirst({ where: { withdrawalId: id, deletedAt: null } });
       if (!transaction) throw new NotFoundException('Withdrawal transaction not found');
-      await tx.transaction.update({ where: { id: transaction.id }, data: { status: TransactionStatus.COMPLETED, processedAt: now } });
+      await tx.transaction.updateMany({ where: { id: transaction.id, status: { in: [TransactionStatus.PENDING, TransactionStatus.PROCESSING] } }, data: { status: TransactionStatus.COMPLETED, processedAt: now } });
       await tx.wallet.update({ where: { id: transaction.walletId }, data: { totalWithdrawn: { increment: withdrawal.amount }, lastTransactionAt: now } });
       return tx.withdrawal.update({ where: { id }, data: { status: WithdrawalStatus.COMPLETED, completedAt: now } });
     });
@@ -133,10 +146,15 @@ export class FinancialService {
       if (!user) throw new NotFoundException('User not found');
       const wallet = await tx.wallet.upsert({ where: { userId_type: { userId: input.userId, type: input.type } }, create: { userId: input.userId, type: input.type, currency: input.currency ?? 'USD' }, update: {} });
       if (!wallet.isActive || wallet.deletedAt) throw new BadRequestException('Wallet is not active');
-      if (direction === 'DEBIT' && wallet.balance.lt(amount)) throw new BadRequestException('Insufficient wallet balance');
-      const totalUpdate = direction === 'CREDIT' ? { totalDeposited: { increment: amount } } : input.transactionType === TransactionType.WITHDRAWAL ? { totalWithdrawn: { increment: amount } } : {};
-      const updatedWallet = await tx.wallet.update({ where: { id: wallet.id }, data: { balance: direction === 'CREDIT' ? { increment: amount } : { decrement: amount }, lastTransactionAt: new Date(), ...totalUpdate } });
-      return tx.transaction.create({ data: { userId: input.userId, walletId: updatedWallet.id, type: input.transactionType, status: TransactionStatus.COMPLETED, amount, fee: new Prisma.Decimal(0), netAmount: amount, currency: input.currency ?? updatedWallet.currency, description: input.description, reference: input.reference, processedAt: new Date() } });
+      const now = new Date();
+      if (direction === 'DEBIT') {
+        const debited = await tx.wallet.updateMany({ where: { id: wallet.id, isActive: true, deletedAt: null, balance: { gte: amount } }, data: { balance: { decrement: amount }, lastTransactionAt: now, ...(input.transactionType === TransactionType.WITHDRAWAL ? { totalWithdrawn: { increment: amount } } : {}) } });
+        if (debited.count !== 1) throw new BadRequestException('Insufficient wallet balance');
+      } else {
+        await tx.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: amount }, lastTransactionAt: now, totalDeposited: { increment: amount } } });
+      }
+      const updatedWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+      return tx.transaction.create({ data: { userId: input.userId, walletId: updatedWallet.id, type: input.transactionType, status: TransactionStatus.COMPLETED, amount, fee: new Prisma.Decimal(0), netAmount: amount, currency: input.currency ?? updatedWallet.currency, description: input.description, reference: input.reference, processedAt: now } });
     });
   }
 }
