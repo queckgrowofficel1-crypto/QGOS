@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
 import { AutomationController } from './automation.controller';
 import { AutomationService } from './automation.service';
 import { AutomationStore } from './automation.store';
@@ -8,6 +9,7 @@ import { AutomationQueue } from './automation.queue';
 import { AutomationRetryService } from './automation.retry';
 
 @Module({
+  imports: [PrismaModule],
   controllers: [AutomationController],
   providers: [AutomationService, AutomationStore, AutomationExecutor, AutomationScheduler, AutomationQueue, AutomationRetryService],
   exports: [AutomationService, AutomationExecutor, AutomationScheduler, AutomationQueue, AutomationRetryService],
