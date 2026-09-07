@@ -44,3 +44,34 @@ jobs:
 
       - name: Build production Docker image
         run: docker build -t qgos:ci .
+
+      - name: Production health smoke test
+        env:
+          NODE_ENV: production
+          CORS_ORIGIN: http://localhost:3000
+          ENABLE_SWAGGER: 'false'
+          JWT_SECRET: ci-only-not-a-production-secret
+          PORT: '3000'
+          HOST: 127.0.0.1
+        run: |
+          node dist/main.js > /tmp/qgos.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
+
+          for attempt in {1..20}; do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/health; then
+              echo
+              echo "QGOS health check passed"
+              exit 0
+            fi
+            if ! kill -0 "$APP_PID" 2>/dev/null; then
+              echo "QGOS process exited before health check passed"
+              cat /tmp/qgos.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "QGOS health check timed out"
+          cat /tmp/qgos.log
+          exit 1
