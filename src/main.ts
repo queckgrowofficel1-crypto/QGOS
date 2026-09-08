@@ -6,6 +6,7 @@ import compression = require('compression');
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { requestContextMiddleware } from './common/request-context';
+import { requestLoggingMiddleware } from './common/request-logging';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,6 +17,7 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
   app.use(requestContextMiddleware);
+  app.use(requestLoggingMiddleware);
 
   app.useGlobalPipes(
     new ValidationPipe({
