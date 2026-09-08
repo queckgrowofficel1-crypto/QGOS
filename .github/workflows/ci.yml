@@ -59,9 +59,16 @@ jobs:
           trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
 
           for attempt in {1..20}; do
-            if curl --fail --silent --show-error http://127.0.0.1:3000/health; then
-              echo
-              echo "QGOS health check passed"
+            if curl --fail --silent --show-error --dump-header /tmp/qgos.headers http://127.0.0.1:3000/health > /tmp/qgos.health; then
+              echo "QGOS health response:"
+              cat /tmp/qgos.health
+              echo "QGOS response headers:"
+              cat /tmp/qgos.headers
+              grep -qi '^x-request-id:' /tmp/qgos.headers || {
+                echo "X-Request-Id response header missing"
+                exit 1
+              }
+              echo "QGOS health and request correlation checks passed"
               exit 0
             fi
             if ! kill -0 "$APP_PID" 2>/dev/null; then
