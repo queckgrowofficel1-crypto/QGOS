@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import compression = require('compression');
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { requestContextMiddleware } from './common/request-context';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,6 +15,7 @@ async function bootstrap() {
 
   app.use(helmet());
   app.use(compression());
+  app.use(requestContextMiddleware);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -39,7 +41,7 @@ async function bootstrap() {
     origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
   });
 
   if (!isProduction || configService.get<string>('ENABLE_SWAGGER', 'false') === 'true') {
