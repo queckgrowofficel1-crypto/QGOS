@@ -59,6 +59,13 @@ jobs:
       - name: Unit tests
         run: npm test -- --runInBand --passWithNoTests
 
+      - name: End-to-end tests
+        env:
+          NODE_ENV: test
+          CORS_ORIGIN: http://localhost:3000
+          JWT_SECRET: ci-only-e2e-secret
+        run: npm run test:e2e -- --runInBand
+
       - name: Build production Docker image
         run: docker build -t qgos:ci .
 
