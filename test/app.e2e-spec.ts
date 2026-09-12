@@ -2,6 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { requestContextMiddleware } from '../src/common/request-context';
+import { requestLoggingMiddleware } from '../src/common/request-logging';
 
 describe('QGOS API (e2e)', () => {
   let app: INestApplication;
@@ -16,6 +18,8 @@ describe('QGOS API (e2e)', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
+    app.use(requestContextMiddleware);
+    app.use(requestLoggingMiddleware);
     await app.init();
   });
 
