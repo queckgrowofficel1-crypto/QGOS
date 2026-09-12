@@ -6,6 +6,8 @@ Enterprise-grade AI Operating System built with NestJS and Prisma.
 
 QGOS is a comprehensive AI Operating System designed for enterprise environments, providing a scalable, modular architecture for AI services, data management, and business logic orchestration.
 
+The existing QuickGrow website remains the execution platform; QGOS extends the existing system rather than replacing it.
+
 ## Tech Stack
 
 - **Framework:** NestJS 10.x
@@ -52,10 +54,7 @@ For production, `NODE_ENV=production` requires an explicit `CORS_ORIGIN`. Swagge
 ### 4. Database Setup
 
 ```bash
-# Generate Prisma client
 npm run prisma:generate
-
-# Run migrations for development
 npm run prisma:migrate:dev
 ```
 
@@ -67,8 +66,7 @@ For production deployments, use `npm run prisma:migrate:deploy` against the prod
 npm run start:dev
 ```
 
-The API will be available at `http://localhost:3000`  
-Swagger Documentation: `http://localhost:3000/api`
+The API will be available at `http://localhost:3000`.
 
 ## Production Verification
 
@@ -77,78 +75,15 @@ npm run build
 npm run prisma:generate
 npm run lint:check
 npm test -- --runInBand --passWithNoTests
+npm run test:e2e
 docker build -t qgos:production .
 ```
 
 The API exposes `GET /health` for runtime health checks. The production Docker image also includes a container healthcheck for this endpoint.
 
-## Available Scripts
+## Release & Go-Live
 
-### Development
-
-```bash
-npm run start          # Start production server
-npm run start:dev      # Start with hot-reload
-npm run start:debug    # Start with debugger
-```
-
-### Database
-
-```bash
-npm run prisma:generate       # Generate Prisma client
-npm run prisma:migrate:dev    # Create and run migrations
-npm run prisma:migrate:deploy # Deploy migrations to production
-npm run prisma:studio         # Open Prisma Studio
-```
-
-### Build & Testing
-
-```bash
-npm run build        # Build for production
-npm run lint         # Run ESLint with fixes
-npm run lint:check   # Run ESLint without changes
-npm run format       # Format code with Prettier
-npm run test         # Run unit tests
-npm run test:watch   # Run tests in watch mode
-npm run test:cov     # Generate coverage report
-npm run test:e2e     # Run end-to-end tests
-```
-
-### Docker
-
-```bash
-npm run docker:up      # Start Docker containers
-npm run docker:down    # Stop Docker containers
-npm run docker:build   # Build Docker image
-```
-
-## Project Structure
-
-```
-src/
-├── main.ts                 # Application entry point
-├── app.module.ts           # Root module
-├── modules/                # Feature modules
-├── common/                 # Shared utilities, decorators, filters
-├── config/                 # Configuration
-└── database/               # Database setup
-
-prisma/
-├── schema.prisma           # Database schema
-└── migrations/             # Database migrations
-
-docs/
-└── [documentation files]
-
-test/
-└── [test files]
-```
-
-## API Documentation
-
-Swagger is available at `http://localhost:3000/api` in development. In production it remains disabled unless `ENABLE_SWAGGER=true` is explicitly configured.
-
-## Release & Handover
+The roadmap currently includes Phases 1–13. Phases 8–12 harden, release-engineer, hand over, secure, and operationalize the system. Phase 13 is the final Go-Live / Production Launch gate.
 
 See:
 
@@ -156,10 +91,81 @@ See:
 - `docs/PHASE_9_RELEASE_ENGINEERING.md`
 - `docs/PHASE_10_FINAL_RELEASE.md`
 - `docs/PHASE_11_PRODUCTION_HANDOVER.md`
+- `docs/PHASE_12_SECURITY_OBSERVABILITY.md`
+- `docs/PHASE_13_FINAL_GO_LIVE.md`
+- `docs/OPERATIONS_RUNBOOK.md`
+
+Phase 13 separates repository/CI completion from external deployment-owner prerequisites such as production credentials, database provisioning, backups, domain/TLS, monitoring, and business/compliance sign-off.
+
+## Available Scripts
+
+### Development
+
+```bash
+npm run start
+npm run start:dev
+npm run start:debug
+```
+
+### Database
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate:dev
+npm run prisma:migrate:deploy
+npm run prisma:studio
+```
+
+### Build & Testing
+
+```bash
+npm run build
+npm run lint
+npm run lint:check
+npm run format
+npm run test
+npm run test:watch
+npm run test:cov
+npm run test:e2e
+```
+
+### Docker
+
+```bash
+npm run docker:up
+npm run docker:down
+npm run docker:build
+```
+
+## Project Structure
+
+```
+src/
+├── main.ts
+├── app.module.ts
+├── modules/
+├── common/
+├── config/
+└── database/
+
+prisma/
+├── schema.prisma
+└── migrations/
+
+docs/
+└── [documentation files]
+
+test/
+└── [e2e tests]
+```
+
+## API Documentation
+
+Swagger is available at `http://localhost:3000/api` in development. In production it remains disabled unless `ENABLE_SWAGGER=true` is explicitly configured.
 
 ## Contributing
 
-See [CONTRIBUTING.md](./docs/CONTRIBUTING.md) for guidelines.
+See `docs/CONTRIBUTING.md` for guidelines.
 
 ## License
 
