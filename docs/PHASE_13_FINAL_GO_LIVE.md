@@ -8,7 +8,7 @@ Complete the final release gate for QGOS on top of the existing system. This pha
 ### 1. Repository and release integrity
 - [x] Existing QGOS implementation remains the source of truth.
 - [x] Phases 1–12 implementation and operational documentation are committed.
-- [ ] Final CI run on `main` is green after the latest changes.
+- [x] Final CI run on `main` is green after the latest changes.
 - [ ] Final release commit/tag is recorded.
 
 ### 2. Application verification
@@ -19,7 +19,7 @@ Complete the final release gate for QGOS on top of the existing system. This pha
 - [x] Production Docker image build is part of CI.
 - [x] Compiled production process health smoke test is part of CI.
 - [x] Request correlation (`X-Request-Id`) is verified by the smoke test.
-- [ ] Final CI must pass all of the above without skipped/failed required steps.
+- [x] Final CI passed all required repository/application checks without skipped required steps.
 
 ### 3. Production configuration
 The deployment owner must configure real production values outside source control:
@@ -81,6 +81,8 @@ GitHub code changes alone cannot provision external production infrastructure or
 
 ## Current Status
 
-**Phase 13 implementation/documentation: IN PROGRESS**
+**Phase 13 repository implementation/documentation: COMPLETE**
 
-The remaining work is primarily final CI verification plus deployment-owner production prerequisites. The repository must not be described as fully live until those external prerequisites and the final green CI gate are verified.
+The repository-side technical release gate is green. The remaining unchecked items are external, operator-controlled production launch prerequisites: real production secrets/configuration, production database and backups, domain/TLS, deployment, monitoring/alerts, operational sign-off, and the final release tag.
+
+The project should not be described as fully live until those external prerequisites are completed and verified.
