@@ -6,6 +6,7 @@ import { AutomationModule } from './modules/automation/automation.module';
 import { FinancialModule } from './modules/financial/financial.module';
 import { NetworkModule } from './modules/network/network.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { BusinessPlanModule } from './modules/business-plan/business-plan.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -20,6 +21,7 @@ import { HealthController } from './health.controller';
     FinancialModule,
     NetworkModule,
     AdminModule,
+    BusinessPlanModule,
   ],
   controllers: [HealthController],
 })
