@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { MessageRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -11,6 +11,7 @@ export class AIService {
   }
 
   async getArmyReadiness(workspaceId: string) {
+    if (!workspaceId?.trim()) throw new BadRequestException('workspaceId query parameter is required');
     await this.ensureWorkspace(workspaceId);
     const [agents, availableModels] = await Promise.all([
       this.prisma.aIAgent.findMany({
