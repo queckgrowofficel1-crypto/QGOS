@@ -230,7 +230,7 @@ export class WorkflowService {
         outputs[step.id] = safeResult;
         await this.prisma.task.update({
           where: { id: task.id },
-          data: { status: TaskStatus.COMPLETED, output: safeResult as Prisma.InputJsonValue, completedAt: new Date(), durationMs: Math.max(0, Date.now() - task.startedAt.getTime()) },
+          data: { status: TaskStatus.COMPLETED, output: { value: safeResult } as Prisma.InputJsonValue, completedAt: new Date(), durationMs: Math.max(0, Date.now() - task.startedAt.getTime()) },
         });
         currentTaskId = undefined;
       }
