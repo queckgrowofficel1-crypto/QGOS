@@ -9,6 +9,11 @@ export class AIController {
   @Get('models')
   listModels() { return this.ai.listModels(); }
 
+  @Get('army/readiness')
+  getArmyReadiness(@Query('workspaceId') workspaceId: string) {
+    return this.ai.getArmyReadiness(workspaceId);
+  }
+
   @Get('agents')
   listAgents(@Query('workspaceId') workspaceId: string) { return this.ai.listAgents(workspaceId); }
 
