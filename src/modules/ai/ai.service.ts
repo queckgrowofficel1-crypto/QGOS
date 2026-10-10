@@ -1,10 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { MessageRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AIProviderService } from './ai-provider';
 
 @Injectable()
 export class AIService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiProvider: AIProviderService,
+  ) {}
 
   listModels() {
     return this.prisma.aIModel.findMany({ where: { isAvailable: true }, orderBy: { name: 'asc' } });
@@ -31,6 +35,7 @@ export class AIService {
     if (activeAgents === 0) blockers.push('No ACTIVE AI agents are configured in this workspace');
     if (availableModels === 0) blockers.push('No available AI models are configured in the database');
     if (!providerConfigured) blockers.push('Runtime AI provider is missing, unsupported, or lacks its API key');
+    blockers.push('Live model inference must be verified with a staging conversation');
     blockers.push('External QueckGrow Job System API contract and staging integration are not verified');
     blockers.push('AI_AGENT_CALL, WEBHOOK, and DATA_FETCH workflow adapters are disabled; only deterministic local steps execute');
     blockers.push('Workflow execution is synchronous; durable queue, retry, timeout, and dead-letter handling are not configured');
@@ -89,6 +94,71 @@ export class AIService {
       await tx.conversation.update({ where: { id: conversationId }, data: { messageCount: { increment: 1 } } });
       return message;
     });
+  }
+
+  /**
+   * Runs an explicitly selected, active agent against an explicitly selected available OpenAI LLM.
+   * Only conversation USER/ASSISTANT messages are sent as history; caller-supplied SYSTEM messages are excluded.
+   * This creates one assistant message and never invokes financial or external Job System actions.
+   */
+  async respondToConversation(conversationId: string, input: { modelId: string; temperature?: number }) {
+    if (!input.modelId?.trim()) throw new BadRequestException('modelId is required');
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { id: conversationId, deletedAt: null, status: 'ACTIVE' },
+      include: {
+        agent: true,
+        messages: { orderBy: { createdAt: 'desc' }, take: 20 },
+      },
+    });
+    if (!conversation) throw new NotFoundException('Active conversation not found');
+    if (!conversation.agent || conversation.agent.deletedAt || conversation.agent.status !== 'ACTIVE') {
+      throw new BadRequestException('Conversation must be linked to an active AI agent');
+    }
+
+    const model = await this.prisma.aIModel.findFirst({
+      where: { id: input.modelId, isAvailable: true, provider: 'OPENAI', type: 'LLM' },
+    });
+    if (!model) throw new NotFoundException('Selected model must be an available OpenAI LLM');
+    if (process.env.AI_PROVIDER?.toLowerCase() !== 'openai' || !process.env.OPENAI_API_KEY) {
+      throw new ServiceUnavailableException('OpenAI provider is not configured');
+    }
+
+    const history = conversation.messages
+      .filter((message) => message.role === 'USER' || message.role === 'ASSISTANT')
+      .reverse()
+      .map((message) => ({ role: message.role === 'USER' ? 'user' : 'assistant', content: message.content }));
+
+    if (history.length === 0 || history[history.length - 1].role !== 'user') {
+      throw new BadRequestException('Add a user message before requesting an agent response');
+    }
+
+    const completion = await this.aiProvider.complete({
+      model: model.name,
+      systemPrompt: conversation.agent.systemPrompt,
+      messages: history,
+      ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
+    });
+
+    const message = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.message.create({
+        data: {
+          conversationId,
+          role: 'ASSISTANT',
+          content: completion.content,
+          modelId: model.id,
+          ...(completion.usage?.totalTokens === undefined ? {} : { tokens: completion.usage.totalTokens }),
+          metadata: {
+            provider: completion.provider,
+            model: completion.model,
+            usage: completion.usage as Prisma.InputJsonValue | undefined,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await tx.conversation.update({ where: { id: conversationId }, data: { messageCount: { increment: 1 } } });
+      return created;
+    });
+
+    return { message, provider: completion.provider, model: completion.model, usage: completion.usage };
   }
 
   async getConversation(id: string) {
