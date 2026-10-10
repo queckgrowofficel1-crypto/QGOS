@@ -150,7 +150,7 @@ export class AIService {
           metadata: {
             provider: completion.provider,
             model: completion.model,
-            usage: completion.usage as Prisma.InputJsonValue | undefined,
+            ...(completion.usage === undefined ? {} : { usage: completion.usage as Prisma.InputJsonValue }),
           } as Prisma.InputJsonValue,
         },
       });
