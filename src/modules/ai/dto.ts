@@ -1,5 +1,5 @@
 import { MessageRole } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class CreateAgentDto {
   @IsString() @IsNotEmpty() workspaceId!: string;
@@ -22,4 +22,9 @@ export class AddMessageDto {
   @IsString() @IsNotEmpty() content!: string;
   @IsOptional() @IsString() modelId?: string;
   @IsOptional() @IsObject() metadata?: Record<string, unknown>;
+}
+
+export class RespondToAgentDto {
+  @IsString() @IsNotEmpty() modelId!: string;
+  @IsOptional() @IsNumber() @Min(0) @Max(2) temperature?: number;
 }
