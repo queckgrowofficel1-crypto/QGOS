@@ -3,6 +3,7 @@
 ## Implemented in the repository
 
 - AI agent records can be created and listed per workspace.
+- POST /ai/conversations/:id/respond invokes the configured OpenAI provider for an active agent and explicitly selected available OpenAI LLM; it persists the assistant response and usage metadata.
 - Available AI models are listed from the database.
 - Runtime AI provider configuration is reported without exposing the key.
 - Workflow definitions are validated before creation and publication.
