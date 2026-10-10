@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AIService } from './ai.service';
-import { AddMessageDto, CreateAgentDto, CreateConversationDto } from './dto';
+import { AddMessageDto, CreateAgentDto, CreateConversationDto, RespondToAgentDto } from './dto';
 
 @Controller('ai')
 export class AIController {
@@ -28,4 +28,9 @@ export class AIController {
 
   @Post('conversations/:id/messages')
   addMessage(@Param('id') id: string, @Body() body: AddMessageDto) { return this.ai.addMessage(id, body); }
+
+  @Post('conversations/:id/respond')
+  respondToAgent(@Param('id') id: string, @Body() body: RespondToAgentDto) {
+    return this.ai.respondToConversation(id, body);
+  }
 }
