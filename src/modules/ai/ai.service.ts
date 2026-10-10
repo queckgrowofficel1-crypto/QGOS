@@ -111,8 +111,8 @@ export class AIService {
       },
     });
     if (!conversation) throw new NotFoundException('Active conversation not found');
-    if (!conversation.agent || conversation.agent.deletedAt || conversation.agent.status !== 'ACTIVE') {
-      throw new BadRequestException('Conversation must be linked to an active AI agent');
+    if (!conversation.agent || conversation.agent.deletedAt || conversation.agent.status !== 'ACTIVE' || conversation.agent.workspaceId !== conversation.workspaceId) {
+      throw new BadRequestException('Conversation must be linked to an active AI agent in the same workspace');
     }
 
     const model = await this.prisma.aIModel.findFirst({
