@@ -31,8 +31,9 @@ export class AIService {
     if (activeAgents === 0) blockers.push('No ACTIVE AI agents are configured in this workspace');
     if (availableModels === 0) blockers.push('No available AI models are configured in the database');
     if (!providerConfigured) blockers.push('Runtime AI provider is missing, unsupported, or lacks its API key');
-    blockers.push('External QueckGrow Job System integration is not verified');
-    blockers.push('Workflow executions are queued as PENDING; a worker must process them before claiming autonomous execution');
+    blockers.push('External QueckGrow Job System API contract and staging integration are not verified');
+    blockers.push('AI_AGENT_CALL, WEBHOOK, and DATA_FETCH workflow adapters are disabled; only deterministic local steps execute');
+    blockers.push('Workflow execution is synchronous; durable queue, retry, timeout, and dead-letter handling are not configured');
 
     return {
       status: activeAgents > 0 && availableModels > 0 && providerConfigured ? 'CONFIGURED_WITH_INTEGRATION_BLOCKERS' : 'NOT_READY',
