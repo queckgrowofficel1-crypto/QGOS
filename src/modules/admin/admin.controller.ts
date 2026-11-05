@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { FinancialWriteGuard } from '../financial/financial-write.guard';
 import { AdminAuditQueryDto, AdminWithdrawalDecisionDto, UpdateUserAdminDto } from './admin.dto';
 import { AdminGuard } from './admin.guard';
 import { AdminService } from './admin.service';
@@ -22,16 +23,19 @@ export class AdminController {
   @Get('approvals')
   approvals() { return this.admin.approvalQueue(); }
 
+  @UseGuards(FinancialWriteGuard)
   @Post('withdrawals/:id/approve')
   approveWithdrawal(@Param('id') id: string, @Body() body: AdminWithdrawalDecisionDto) {
     return this.admin.approveWithdrawal(id, body);
   }
 
+  @UseGuards(FinancialWriteGuard)
   @Post('withdrawals/:id/reject')
   rejectWithdrawal(@Param('id') id: string, @Body() body: AdminWithdrawalDecisionDto) {
     return this.admin.rejectWithdrawal(id, body);
   }
 
+  @UseGuards(FinancialWriteGuard)
   @Post('withdrawals/:id/complete')
   completeWithdrawal(@Param('id') id: string, @Body() body: AdminWithdrawalDecisionDto) {
     return this.admin.completeWithdrawal(id, body.actorId);
