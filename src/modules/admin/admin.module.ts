@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FinancialModule } from '../financial/financial.module';
+import { FinancialWriteGuard } from '../financial/financial-write.guard';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AdminController } from './admin.controller';
 import { AdminGuard } from './admin.guard';
@@ -8,7 +9,7 @@ import { AdminService } from './admin.service';
 @Module({
   imports: [PrismaModule, FinancialModule],
   controllers: [AdminController],
-  providers: [AdminService, AdminGuard],
+  providers: [AdminService, AdminGuard, FinancialWriteGuard],
   exports: [AdminService],
 })
 export class AdminModule {}
